@@ -1,13 +1,8 @@
 ﻿namespace ExtractAPI.Model
 {
-    public class UploadResponse
+    public class DocumentInfo
     {
-
         public string FileName { get; set; } = string.Empty;
-
-        public long FileSize { get; set; }
-
-        public string FileType { get; set; } = string.Empty;
 
         public string ExtractedText { get; set; } = string.Empty;
 

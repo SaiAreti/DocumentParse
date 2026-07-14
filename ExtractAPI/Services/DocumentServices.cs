@@ -1,7 +1,5 @@
 ﻿using ExtractAPI.Extraction;
-using ExtractAPI.Helper;
 using ExtractAPI.Model;
-using iText.Kernel.Pdf.Canvas.Parser;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 
@@ -9,76 +7,85 @@ namespace ExtractAPI.Services
 {
     public class DocumentServices : IDocumentServices
     {
-
         private readonly IWebHostEnvironment _environment;
         private readonly ITextExtractor _pdfExtractor;
-        //private readonly ITextExtractor _wordExtractor;
+        private readonly ISummaryService _summaryService;
+        private readonly IDocumentRepository _documentRepository;
 
         public DocumentServices(
             IWebHostEnvironment environment,
-            ITextExtractor pdfExtractor
-            //ITextExtractor wordExtractor
-            )
+            ITextExtractor pdfExtractor,
+            ISummaryService summaryService,
+            IDocumentRepository documentRepository)
         {
             _environment = environment;
             _pdfExtractor = pdfExtractor;
-            //_wordExtractor = wordExtractor;
+            _summaryService = summaryService;
+            _documentRepository = documentRepository;
         }
+
         public async Task<UploadResponse> ProcessDocumentAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
-                throw new ArgumentException("Invalid file.");
+                throw new ArgumentException("Please upload a valid PDF file.");
             }
 
-            string uploadsFolder = Path.Combine( _environment.WebRootPath,"uploads");
+            // Create Uploads folder if it doesn't exist
+            string uploadFolder = Path.Combine(_environment.WebRootPath, "Uploads");
+
+            if (!Directory.Exists(uploadFolder))
             {
-                Directory.CreateDirectory(uploadsFolder);
+                Directory.CreateDirectory(uploadFolder);
             }
 
-            // Generate a unique file name
+            // Generate unique filename
             string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
 
-            // Full path to save file
-            string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+            // Full file path
+            string filePath = Path.Combine(uploadFolder, uniqueFileName);
 
-            // Save uploaded file
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            // Save file
+            using (FileStream stream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
 
-            // Extract text based on file type
-            string extractedText;
-            string extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            // Validate file type
+            string extension = Path.GetExtension(file.FileName).ToLower();
 
-            switch (extension)
+            if (extension != ".pdf")
             {
-                case ".pdf":
-                    extractedText = await _pdfExtractor.ExtractTextAsync(filePath);
-                    break;
-/*
-                case ".docx":
-                    extractedText = await _wordExtractor.ExtractTextAsync(filePath);
-                    break;*/
-
-                default:
-                    throw new NotSupportedException("Only PDF and DOCX files are supported.");
+                throw new NotSupportedException("Only PDF files are supported.");
             }
 
+            // Extract text
+            string extractedText = await _pdfExtractor.ExtractTextAsync(filePath);
+
             // Generate summary
-            string summary = SummaryHelper.GenerateSummary(extractedText);
+            string summary = await _summaryService.GenerateSummaryAsync(extractedText);
+
+            // Save document into repository
+            var document = new DocumentInfo
+            {
+                FileName = file.FileName,
+                ExtractedText = extractedText,
+                Summary = summary,
+                UploadedOn = DateTime.UtcNow
+            };
+
+            await _documentRepository.AddAsync(document);
 
             // Return response
             return new UploadResponse
             {
                 FileName = file.FileName,
+                FileSize = file.Length,
+                FileType = extension,
+                UploadedOn = DateTime.UtcNow,
                 ExtractedText = extractedText,
                 Summary = summary
             };
-
-
-
         }
     }
 }

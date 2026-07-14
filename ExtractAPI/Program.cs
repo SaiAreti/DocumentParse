@@ -13,10 +13,14 @@ builder.Services.AddControllers();
 
 // Register application services
 builder.Services.AddScoped<IDocumentServices, DocumentServices>();
-// Register PDF Text Extractor
+
 builder.Services.AddScoped<ITextExtractor, PdfExtraction>();
-// Register Word Text Extractor
-///builder.Services.AddScoped<ITextExtractor, WordExtraction>();
+
+builder.Services.AddScoped<ISummaryService, SummaryService>();
+
+builder.Services.AddSingleton<IDocumentRepository, DocumentRepository>();
+
+builder.Services.AddScoped<IQuestionAnswerService, QuestionAnswerService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
