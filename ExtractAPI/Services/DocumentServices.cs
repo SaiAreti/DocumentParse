@@ -1,4 +1,5 @@
 ﻿using ExtractAPI.Extraction;
+using ExtractAPI.Helper;
 using ExtractAPI.Model;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,18 +10,15 @@ namespace ExtractAPI.Services
     {
         private readonly IWebHostEnvironment _environment;
         private readonly ITextExtractor _pdfExtractor;
-        private readonly ISummaryService _summaryService;
         private readonly IDocumentRepository _documentRepository;
 
         public DocumentServices(
             IWebHostEnvironment environment,
             ITextExtractor pdfExtractor,
-            ISummaryService summaryService,
             IDocumentRepository documentRepository)
         {
             _environment = environment;
             _pdfExtractor = pdfExtractor;
-            _summaryService = summaryService;
             _documentRepository = documentRepository;
         }
 
@@ -28,47 +26,47 @@ namespace ExtractAPI.Services
         {
             if (file == null || file.Length == 0)
             {
-                throw new ArgumentException("Please upload a valid PDF file.");
+                throw new ArgumentException("Please upload a valid file.");
             }
 
             // Create Uploads folder if it doesn't exist
-            string uploadFolder = Path.Combine(_environment.WebRootPath, "Uploads");
+            string uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads");
 
-            if (!Directory.Exists(uploadFolder))
+            if (!Directory.Exists(uploadsFolder))
             {
-                Directory.CreateDirectory(uploadFolder);
+                Directory.CreateDirectory(uploadsFolder);
             }
 
-            // Generate unique filename
+            // Save uploaded file
             string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            string filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-            // Full file path
-            string filePath = Path.Combine(uploadFolder, uniqueFileName);
-
-            // Save file
-            using (FileStream stream = new FileStream(filePath, FileMode.Create))
+            using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
 
-            // Validate file type
-            string extension = Path.GetExtension(file.FileName).ToLower();
+            // Extract text
+            string extractedText;
 
-            if (extension != ".pdf")
+            switch (Path.GetExtension(file.FileName).ToLower())
             {
-                throw new NotSupportedException("Only PDF files are supported.");
+                case ".pdf":
+                    extractedText = await _pdfExtractor.ExtractTextAsync(filePath);
+                    break;
+
+                default:
+                    throw new NotSupportedException("Only PDF files are supported.");
             }
 
-            // Extract text
-            string extractedText = await _pdfExtractor.ExtractTextAsync(filePath);
+            // Generate Summary
+            string summary = SummaryHelper.GenerateSummary(extractedText);
 
-            // Generate summary
-            string summary = await _summaryService.GenerateSummaryAsync(extractedText);
-
-            // Save document into repository
-            var document = new DocumentInfo
+            // Save to SQL Server
+            var document = new Document
             {
                 FileName = file.FileName,
+                FilePath = filePath,
                 ExtractedText = extractedText,
                 Summary = summary,
                 UploadedOn = DateTime.UtcNow
@@ -76,15 +74,12 @@ namespace ExtractAPI.Services
 
             await _documentRepository.AddAsync(document);
 
-            // Return response
+            // Return Response
             return new UploadResponse
             {
-                FileName = file.FileName,
-                FileSize = file.Length,
-                FileType = extension,
-                UploadedOn = DateTime.UtcNow,
-                ExtractedText = extractedText,
-                Summary = summary
+                FileName = document.FileName,
+                ExtractedText = document.ExtractedText,
+                Summary = document.Summary
             };
         }
     }

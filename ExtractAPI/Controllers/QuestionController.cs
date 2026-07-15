@@ -23,7 +23,7 @@ namespace ExtractAPI.Controllers
         [HttpPost("ask")]
         public async Task<IActionResult> AskQuestion([FromBody] QuestionRequest request)
         {
-            var document = await _repository.GetByFileNameAsync(request.FileName);
+            var document = await _repository.GetByFileNameAsync(request.Id);
 
             if (document == null)
             {

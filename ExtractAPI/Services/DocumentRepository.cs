@@ -1,35 +1,51 @@
-﻿using ExtractAPI.Model;
+﻿using DocumentFormat.OpenXml.Office2010.Excel;
+using ExtractAPI.Data;
+using ExtractAPI.Model;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExtractAPI.Services
 {
     public class DocumentRepository : IDocumentRepository
     {
-        private static readonly Dictionary<string, DocumentInfo> _documents = new();
+        private readonly ApplicationDbContext _context;
 
-        public Task AddAsync(DocumentInfo document)
+        public DocumentRepository(ApplicationDbContext context)
         {
-            _documents[document.FileName] = document;
-
-            return Task.CompletedTask;
+            _context = context;
         }
 
-        public Task<DocumentInfo?> GetByFileNameAsync(string fileName)
+        public async Task<Document> AddAsync(Document document)
         {
-            _documents.TryGetValue(fileName, out var document);
+            _context.Documents.Add(document);
 
-            return Task.FromResult(document);
+            await _context.SaveChangesAsync();
+
+            return document;
         }
 
-        public Task<List<DocumentInfo>> GetAllAsync()
+        public async Task<Document?> GetByFileNameAsync(int id)
         {
-            return Task.FromResult(_documents.Values.ToList());
+            return await _context.Documents
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
 
-        public Task DeleteAsync(string fileName)
+        public async Task<List<Document>> GetAllAsync()
         {
-            _documents.Remove(fileName);
+            return await _context.Documents
+                .OrderByDescending(x => x.UploadedOn)
+                .ToListAsync();
+        }
 
-            return Task.CompletedTask;
+        public async Task DeleteAsync(int id)
+        {
+            var document = await _context.Documents.FindAsync(id);
+
+            if (document == null)
+                return;
+
+            _context.Documents.Remove(document);
+
+            await _context.SaveChangesAsync();
         }
     }
 }

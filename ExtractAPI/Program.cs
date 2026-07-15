@@ -1,15 +1,17 @@
+using ExtractAPI.Data;
 using ExtractAPI.Extraction;
 using ExtractAPI.Services;
-using iText.Kernel.Pdf.Canvas.Parser;
-
-
-
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
+// Add services
 builder.Services.AddControllers();
+
+// Configure SQL Server
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Register application services
 builder.Services.AddScoped<IDocumentServices, DocumentServices>();
@@ -18,16 +20,18 @@ builder.Services.AddScoped<ITextExtractor, PdfExtraction>();
 
 builder.Services.AddScoped<ISummaryService, SummaryService>();
 
-builder.Services.AddSingleton<IDocumentRepository, DocumentRepository>();
+// Repository (must be Scoped)
+builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 
 builder.Services.AddScoped<IQuestionAnswerService, QuestionAnswerService>();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

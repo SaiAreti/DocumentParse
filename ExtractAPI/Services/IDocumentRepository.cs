@@ -4,12 +4,12 @@ namespace ExtractAPI.Services
 {
     public interface IDocumentRepository
     {
-        Task AddAsync(DocumentInfo document);
+        Task<Document> AddAsync(Document document);
 
-        Task<DocumentInfo?> GetByFileNameAsync(string fileName);
+        Task<Document?> GetByFileNameAsync(int id);
 
-        Task<List<DocumentInfo>> GetAllAsync();
+        Task<List<Document>> GetAllAsync();
 
-        Task DeleteAsync(string fileName);
+        Task DeleteAsync(int id);
     }
 }
